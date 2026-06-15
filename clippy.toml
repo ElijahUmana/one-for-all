@@ -1,0 +1,19 @@
+# clippy.toml — SPEC §5 forbidden-API enforcement.
+#
+# Anything in `disallowed-methods` here is a compile-time error when used in
+# the workspace. The `clippy::disallowed_methods` lint is set to deny in each
+# crate's lib.rs / main.rs.
+
+disallowed-methods = [
+    # SPEC §5 Layer D: Page.bringToFront is the ONLY way to surface a tab.
+    # Target.activateTarget would steal focus on macOS — banned codebase-wide.
+    # (Listed as a string match against any function whose name ends with
+    # `activate_target`; broker / browser-engine should never call it.)
+    { path = "browser_engine::cdp::activate_target", reason = "SPEC §5 Layer D: use page.bringToFront — Target.activateTarget steals focus" },
+]
+
+disallowed-types = [
+    # SPEC §10 quality non-negotiables: every channel must be bounded.
+    { path = "tokio::sync::mpsc::UnboundedSender", reason = "SPEC §10: every channel must be bounded — use mpsc::Sender with explicit capacity" },
+    { path = "tokio::sync::mpsc::UnboundedReceiver", reason = "SPEC §10: every channel must be bounded — use mpsc::Receiver with explicit capacity" },
+]

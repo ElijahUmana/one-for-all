@@ -1,0 +1,68 @@
+# cargo-deny configuration for one-for-all.
+# Run with: cargo deny check
+# Tightened over time as v1 ships.
+
+[graph]
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+# ---- Advisories ---------------------------------------------------------
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+ignore = [
+    # number_prefix is unmaintained but pulled transitively via indicatif
+    # → chromium-fetcher's progress bar. No safe upstream alternative until
+    # indicatif drops the dep. Tracked: tighten when indicatif moves to
+    # unit-prefix.
+    "RUSTSEC-2025-0119",
+]
+
+# ---- Licenses -----------------------------------------------------------
+[licenses]
+unused-allowed-license = "allow"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "0BSD",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
+    "OpenSSL",
+    "CC0-1.0",
+]
+confidence-threshold = 0.93
+exceptions = []
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+# ---- Bans ---------------------------------------------------------------
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace-internal path deps may use `version = "*"` since they
+# resolve through `path = "..."`. External wildcards remain denied.
+allow-wildcard-paths = true
+highlight = "all"
+allow = []
+deny = []
+
+# ---- Sources ------------------------------------------------------------
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -1,0 +1,90 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/chromium-fetcher",
+    "crates/cdp-client",
+    "crates/ax-engine",
+    "crates/browser-engine",
+    "crates/broker",
+    "crates/ofa-cli",
+    "crates/focus-manager",
+    "crates/mcp-server",
+    "crates/observability",
+    "crates/sandbox",
+    "crates/bench",
+    "crates/vision",
+    "crates/native-control",
+    "crates/system-control",
+    "crates/terminal-control",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.78"
+license = "MIT"
+repository = "https://github.com/ElijahUmana/one-for-all"
+# Internal-only workspace; nothing is published to crates.io. Marking each
+# crate as private also tells `cargo deny` that wildcard path-deps between
+# crates here are intentional (cargo-deny refuses path wildcards on otherwise-
+# publishable crates because crates.io rejects them).
+publish = false
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "1"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+schemars = { version = "0.8", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-util", "io-std", "net", "time", "sync", "signal", "fs", "process"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+tracing-appender = "0.2"
+parking_lot = "0.12"
+dirs = "5"
+once_cell = "1"
+futures-util = "0.3"
+tokio-util = { version = "0.7", features = ["codec"] }
+bytes = "1"
+# T4 (builder-foundation) additions
+reqwest      = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+sha2         = "0.10"
+zip          = { version = "2.2", default-features = false, features = ["deflate"] }
+indicatif    = "0.17"
+nix          = { version = "0.29", default-features = false, features = ["fs", "process"] }
+dashmap      = "6"
+arc-swap     = "1.7"
+proc-macro2  = "1"
+quote        = "1"
+syn          = { version = "2", features = ["full"] }
+prettyplease = "0.2"
+heck         = "0.5"
+tempfile     = "3"
+hex          = "0.4"
+base64       = "0.22"
+# M10 trace writer — gzip-on-rotate, HMAC manifest, redaction.
+flate2       = "1"
+hmac         = "0.12"
+regex        = "1"
+futures      = "0.3"
+trybuild     = "1"
+# SPEC §11 V5 — zero-copy IPC + bincode binary topic + HDR histograms + SLO benches.
+bincode      = { version = "2", features = ["serde"] }
+hdrhistogram = { version = "7", default-features = false }
+bumpalo      = "3"
+memmap2      = "0.9"
+criterion    = { version = "0.5", default-features = false, features = ["html_reports", "cargo_bench_support"] }
+
+# Path deps for first-party crates that other workspace members consume.
+cdp-client     = { path = "crates/cdp-client" }
+ax-engine      = { path = "crates/ax-engine" }
+focus-manager  = { path = "crates/focus-manager" }
+sandbox        = { path = "crates/sandbox" }
+native-control = { path = "crates/native-control" }
+system-control = { path = "crates/system-control" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+opt-level = 3
+strip = "symbols"
