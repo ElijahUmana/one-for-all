@@ -1,0 +1,202 @@
+[package]
+name = "cdp-client"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Chromium DevTools Protocol client over --remote-debugging-pipe (NUL-delimited JSON, fd 3/4)."
+build = "build.rs"
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true }
+tracing.workspace = true
+futures-util.workspace = true
+once_cell.workspace = true
+parking_lot.workspace = true
+bytes.workspace = true
+
+dashmap = { workspace = true }
+nix     = { workspace = true }
+
+[build-dependencies]
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+proc-macro2   = { workspace = true }
+quote         = { workspace = true }
+syn           = { workspace = true }
+prettyplease  = { workspace = true }
+heck          = { workspace = true }
+anyhow        = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
+tempfile = { workspace = true }
+trybuild = { workspace = true }
+
+# -----------------------------------------------------------------------------
+# CDP domain feature flags
+#
+# Codegen emits one Rust module per CDP domain. The full protocol spans 57
+# domains (~22k LOC); broker + browser-engine only use a small core subset.
+# To keep `cargo build` snappy and the binary small, domains are gated behind
+# per-domain features and bundled into two convenience features:
+#
+# - `cdp-essentials` (DEFAULT) — every domain the workspace currently calls,
+#   plus Storage (commonly needed for cookie/IndexedDB work). 12 domains.
+# - `cdp-full` — every domain in the protocol. Use this if you're consuming
+#   `cdp-client` outside this workspace and need the full surface.
+#
+# Build script reads `CARGO_FEATURE_DOMAIN_*` env vars; a domain whose
+# feature is off contributes neither a `domains::<name>` module nor any
+# variant of the `CdpEvent` enum. Wire events for skipped domains arrive
+# at the reader and are logged at trace level (see connection.rs::dispatch).
+# -----------------------------------------------------------------------------
+[features]
+default = ["cdp-essentials"]
+
+# 19 domains broker + browser-engine actively call. Includes the
+# perf-tooling domains (heap_profiler, performance, profiler, tracing,
+# io) consumed by browser-engine::perf, the css + overlay domains
+# consumed by `perf::start_layout_shift_tracker` / overlay annotations,
+# and the storage domain reserved for cookie/IndexedDB work added in U2.
+cdp-essentials = [
+    "domain-accessibility",
+    "domain-browser",
+    "domain-css",
+    "domain-dom",
+    "domain-dom-snapshot",
+    "domain-emulation",
+    "domain-fetch",
+    "domain-heap-profiler",
+    "domain-input",
+    "domain-io",
+    "domain-network",
+    "domain-overlay",
+    "domain-page",
+    "domain-performance",
+    "domain-profiler",
+    "domain-runtime",
+    "domain-storage",
+    "domain-target",
+    "domain-tracing",
+]
+
+# Stable, non-experimental domains beyond the essentials. Adds the
+# debugger + tracing-adjacent surfaces that integrators sometimes need
+# (debugger, dom-debugger, log, security) without pulling in
+# experimental Animation/Audits/Autofill/etc.
+cdp-stable = [
+    "cdp-essentials",
+    "domain-debugger",
+    "domain-dom-debugger",
+    "domain-log",
+    "domain-security",
+]
+
+# Every domain in the protocol — 57 of them. Heaviest build, full surface.
+cdp-full = [
+    "cdp-stable",
+    "domain-ads",
+    "domain-animation",
+    "domain-audits",
+    "domain-autofill",
+    "domain-background-service",
+    "domain-bluetooth-emulation",
+    "domain-cache-storage",
+    "domain-cast",
+    "domain-console",
+    "domain-crash-report-context",
+    "domain-css",
+    "domain-dom-storage",
+    "domain-device-access",
+    "domain-device-orientation",
+    "domain-event-breakpoints",
+    "domain-extensions",
+    "domain-fed-cm",
+    "domain-file-system",
+    "domain-headless-experimental",
+    "domain-heap-profiler",
+    "domain-indexed-db",
+    "domain-inspector",
+    "domain-layer-tree",
+    "domain-media",
+    "domain-memory",
+    "domain-overlay",
+    "domain-pwa",
+    "domain-performance-timeline",
+    "domain-preload",
+    "domain-schema",
+    "domain-service-worker",
+    "domain-smart-card-emulation",
+    "domain-system-info",
+    "domain-tethering",
+    "domain-web-audio",
+    "domain-web-authn",
+    "domain-web-mcp",
+]
+
+# Per-domain features. Each gates a single CDP domain at codegen time.
+# Names are kebab-case of the snake-cased CDP domain name (matches
+# `feature_name_for` in build.rs). Empty payloads — these are codegen
+# switches, not transitive deps.
+domain-accessibility = []
+domain-ads = []
+domain-animation = []
+domain-audits = []
+domain-autofill = []
+domain-background-service = []
+domain-bluetooth-emulation = []
+domain-browser = []
+domain-cache-storage = []
+domain-cast = []
+domain-console = []
+domain-crash-report-context = []
+domain-css = []
+domain-dom-storage = []
+domain-debugger = []
+domain-device-access = []
+domain-device-orientation = []
+domain-dom = []
+domain-dom-debugger = []
+domain-dom-snapshot = []
+domain-emulation = []
+domain-event-breakpoints = []
+domain-extensions = []
+domain-fed-cm = []
+domain-fetch = []
+domain-file-system = []
+domain-headless-experimental = []
+domain-heap-profiler = []
+domain-indexed-db = []
+domain-input = []
+domain-inspector = []
+domain-io = []
+domain-layer-tree = []
+domain-log = []
+domain-media = []
+domain-memory = []
+domain-network = []
+domain-overlay = []
+domain-pwa = []
+domain-page = []
+domain-performance = []
+domain-performance-timeline = []
+domain-preload = []
+domain-profiler = []
+domain-runtime = []
+domain-schema = []
+domain-security = []
+domain-service-worker = []
+domain-smart-card-emulation = []
+domain-storage = []
+domain-system-info = []
+domain-target = []
+domain-tethering = []
+domain-tracing = []
+domain-web-audio = []
+domain-web-authn = []
+domain-web-mcp = []

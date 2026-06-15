@@ -1,0 +1,31 @@
+error[E0425]: cannot find type `NavigatParams` in module `cdp_client::generated::domains::page`
+  --> tests/ui/method_typo_rejected.rs:10:50
+   |
+10 |     let _: cdp_client::generated::domains::page::NavigatParams =
+   |                                                  ^^^^^^^^^^^^^
+   |
+  ::: $OUT_DIR[cdp-client]/generated/domains.rs
+   |
+   |     pub struct NavigateParams {
+   |     ------------------------- similarly named struct `NavigateParams` defined here
+   |
+help: a struct with a similar name exists
+      |
+10 |     let _: cdp_client::generated::domains::page::NavigateParams =
+   |                                                         +
+
+error[E0422]: cannot find struct, variant or union type `NavigatParams` in module `cdp_client::generated::domains::page`
+  --> tests/ui/method_typo_rejected.rs:11:47
+   |
+11 |         cdp_client::generated::domains::page::NavigatParams {
+   |                                               ^^^^^^^^^^^^^
+   |
+  ::: $OUT_DIR[cdp-client]/generated/domains.rs
+   |
+   |     pub struct NavigateParams {
+   |     ------------------------- similarly named struct `NavigateParams` defined here
+   |
+help: a struct with a similar name exists
+      |
+11 |         cdp_client::generated::domains::page::NavigateParams {
+   |                                                      +
