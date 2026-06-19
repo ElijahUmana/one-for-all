@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TEMPLATE — installed by `installer/install.sh` (T6) which fills in
+  `BROKER_BINARY_PATH` and `LOG_PATH`. Per SPEC §3 (drop order) and SPEC D7
+  (opportunistic singleton — broker also runs as a launchd-managed daemon).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>io.github.elijahumana.one-for-all.broker</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__BROKER_BINARY_PATH__</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>StandardOutPath</key>
+  <string>__HOME__/.one-for-all/logs/broker/broker.stdout.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>__HOME__/.one-for-all/logs/broker/broker.stderr.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OFA_LOG</key>
+    <string>info,broker=debug,browser_engine=info</string>
+  </dict>
+
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>4096</integer>
+  </dict>
+</dict>
+</plist>
