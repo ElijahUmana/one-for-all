@@ -1,0 +1,58 @@
+[package]
+name = "native-control"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "SPEC §11 V2 — universal control surface for native macOS apps via Accessibility API."
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+dashmap.workspace = true
+once_cell.workspace = true
+# U13 — redact_patterns regex engine. Pinned exact major to keep cargo-deny
+# happy with no open ranges.
+regex = "1.10"
+
+# Reuse SPEC §1 D14 stable_id hashing — refs hash byte-identically across
+# the browser AX tree and the macOS AX tree.
+ax-engine = { path = "../ax-engine" }
+
+[features]
+default = ["private-apis"]
+# Private SPI symbols (CGSGetActiveSpace, TISCreateInputSourceList,
+# DFRElementSetControlStripPresetIdentifier). When this feature is OFF the
+# affected tools return `PrivateApiUnavailable` cleanly. We keep the feature
+# default-on for macOS host builds; CI that builds the workspace on Linux
+# excludes target-conditional deps, so the private code compiles only on
+# macOS-with-feature anyway.
+private-apis = []
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Match focus-manager's objc2 pin so we don't compile two copies of the same
+# binding crates.
+objc2 = "0.5"
+objc2-foundation = { version = "0.2", features = ["NSString", "NSArray", "NSDictionary", "NSData", "NSURL"] }
+objc2-app-kit    = { version = "0.2", features = ["NSWorkspace", "NSRunningApplication", "NSPasteboard", "NSPasteboardItem", "libc"] }
+libc = "0.2"
+
+# Core Foundation + Core Graphics are the substrate every AX call deals in
+# (CFString, CFArray, CGPoint, CGSize, CGEvent). Pinned exact major to keep
+# `cargo deny check` happy with no open ranges.
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+core-graphics = { version = "0.24", features = ["highsierra", "elcapitan"] }
+
+# Typed FFI to AXUIElement* and AX constant names. Pinned.
+accessibility-sys = "0.2"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
+tempfile = { workspace = true }
