@@ -1,0 +1,71 @@
+[package]
+name = "vision"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "SPEC §11 V4 — continuous vision pipeline: CDP screencast capture, SIMD tile-hash diff, on-device OCR, optional VLM verification, shared-memory frame ring, and event/notify subscriber for the broker."
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars = { workspace = true }
+tokio = { workspace = true }
+tracing.workspace = true
+parking_lot.workspace = true
+arc-swap.workspace = true
+dashmap.workspace = true
+bytes.workspace = true
+once_cell.workspace = true
+futures-util.workspace = true
+tempfile.workspace = true
+
+# SIMD on stable Rust + xxhash3 tile hashing.
+wide = "0.7"
+twox-hash = "1"
+
+# Shared-memory frame ring backing storage.
+memmap2 = "0.9"
+
+# Frame decoding (JPEG/PNG → RGBA bytes for diff/OCR).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+# Hot-path arena allocations.
+bumpalo = { version = "3", features = ["collections"] }
+
+# Pattern matching for vision.find_text.
+regex = "1"
+
+# Base64 decoding of CDP Page.screencastFrame payloads.
+base64 = "0.22"
+
+# Trait objects for VLM backends.
+async-trait = "0.1"
+
+# Workspace path deps.
+cdp-client = { path = "../cdp-client" }
+browser-engine = { path = "../browser-engine" }
+observability = { path = "../observability" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Apple Vision OCR via objc2. Marked optional behind the `macos-vision`
+# feature so contributors on a Linux dev box can still build the crate;
+# default on macOS turns it on.
+objc2 = { version = "0.5", optional = true }
+objc2-foundation = { version = "0.2", features = ["NSString", "NSArray", "NSError", "NSValue", "NSData", "NSDictionary", "NSGeometry"], optional = true }
+core-graphics = { version = "0.24", features = ["highsierra", "elcapitan"] }
+
+[features]
+default = []
+# Real Apple Vision OCR backend. Off by default so the crate compiles on a
+# bare Linux CI runner; the broker enables it on macOS via target-cfg.
+macos-vision = ["dep:objc2", "dep:objc2-foundation"]
+# Optional VLM backends (HTTP). The Anthropic backend is always compiled in
+# (it just needs reqwest), but the local llama backend is gated.
+vlm-local = []
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread", "rt"] }
+tempfile = { workspace = true }

@@ -1,0 +1,32 @@
+[package]
+name = "sandbox"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "SPEC §11 V3 — per-session APFS clone of the user's Chrome profile + sandbox-exec confinement + state merge-back."
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "ofa-merge"
+path = "src/bin/ofa-merge.rs"
+
+[[bin]]
+name = "ofa-snapshot"
+path = "src/bin/ofa-snapshot.rs"
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+libc = "0.2"
+tempfile.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
