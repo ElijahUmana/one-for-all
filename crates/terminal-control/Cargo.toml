@@ -1,0 +1,27 @@
+[package]
+name = "terminal-control"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "SPEC §12 U9 — PTY-backed terminal surface with parser-maintained snapshots and bounded output buffering."
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+dashmap.workspace = true
+dirs.workspace = true
+nix = { workspace = true, features = ["signal"] }
+portable-pty = "0.9"
+vt100 = "0.16"
+sandbox = { workspace = true }
+observability = { path = "../observability" }
+base64.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
+tempfile.workspace = true
