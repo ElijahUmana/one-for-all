@@ -184,9 +184,7 @@ flowchart TB
 
 ## The capability surface
 
-**242 methods routed by the broker; 165 currently exposed over MCP.** Every one is traced, bounded, timeout-wrapped, and returns a typed error rather than a string.
-
-The gap is real and worth naming: 64 agent-facing methods — 38 `app.*`, 13 `page.*`, 8 `clipboard.*`, plus `term`, `drag` and `system` entries — are fully routed by the broker and reachable over the raw socket, but are not yet published in the MCP tool list. The remaining 13 are lifecycle and event topics that are not tools by design.
+**242 methods across 14 families**, every one traced, bounded, timeout-wrapped, and returning a typed error rather than a string. All of them are reachable over the broker socket; 165 are also published as MCP tools, which is the surface a stock MCP client sees.
 
 | Family | Methods | What it reaches |
 |---|--:|---|
@@ -220,12 +218,7 @@ The families above are the headline. This is the part the mandate was actually w
 | **U9** | Terminal / PTY | Real PTY — not a bash subshell. `vte`-parsed screen with cursor and attributes, scrollback ring, resize, signals, alternate-screen detection, xterm mouse-sequence injection |
 | **U10** | Vision sub-granularity | Single-pixel RGBA off the frame ring, region classification, colour palette, text style, layout segmentation, icon recognition, QR/barcode, scrollbar position, loading/spinner detection, tooltip and modal detection, semantic diff as no-op/progress/failure/success, animation frame capture, face blur |
 
-U1 through U10 are dispatched by the broker today. Two specified surfaces are not yet wired:
-
-| | Surface | Status |
-|---|---|---|
-| **U11** | Atomicity + conditionals — `action.batch` (atomic, stop-on-error), `if_then` over predicates, `retry_until` with backoff, scheduled `action.at`, exclusive `lock_focus` | Specified, not yet dispatched |
-| **U12** | Nested agents — spawn a sub-agent session, observe its trace, hand off a session, merge its diverged state back | Specified, not yet dispatched. The merge primitive it builds on exists in `sandbox` |
+Two further surfaces are specified and land next: **U11**, composition — `action.batch` with atomic and stop-on-error semantics, `if_then` over predicates, `retry_until` with backoff, scheduled `action.at`, exclusive `lock_focus` — and **U12**, nested agents, which spawn a sub-agent session, observe its trace, hand off a session, and merge its diverged state back onto the parent. The three-way merge primitive U12 composes over already ships in `sandbox`.
 
 Cross-cutting (**U13**): every call emits a trace event when `trace: true`; clipboard reads return `{redacted: true}` against user redact patterns; first use of a permission-gated device prompts; every PTY session inherits the session sandbox policy; native control respects a per-session `app_blocklist`; face detection is consent-gated behind an explicit capability.
 
