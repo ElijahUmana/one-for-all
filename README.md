@@ -106,7 +106,9 @@ flowchart LR
 
 ## The capability surface
 
-242 RPC methods. Every one is traced, bounded, timeout-wrapped, and returns a typed error rather than a string.
+**242 methods routed by the broker; 165 currently exposed over MCP.** Every one is traced, bounded, timeout-wrapped, and returns a typed error rather than a string.
+
+The gap is real and worth naming: 64 agent-facing methods — 38 `app.*`, 13 `page.*`, 8 `clipboard.*`, plus `term`, `drag` and `system` entries — are fully routed by the broker and reachable over the raw socket, but are not yet published in the MCP tool list. The remaining 13 are lifecycle and event topics that are not tools by design.
 
 | Family | Methods | What it reaches |
 |---|--:|---|
@@ -218,9 +220,81 @@ flowchart LR
 
 Five independent layers of defence keep a spawning Chromium or a driven native app from taking the frontmost position away from the user, backed by a `NSWorkspace` guardian actor that saves and restores the frontmost application around every focus-risking operation. `clippy::disallowed_methods` is configured to reject every AppKit call that could steal focus outside `focus-manager`, so the boundary is enforced at compile time — and a test asserts no forbidden AppKit symbol appears anywhere else in the workspace.
 
+### Nothing is lost silently
+
+The failure mode this system is built hardest against is not an error — it is a plausible-looking empty result. An agent handed `[]` concludes the screen is empty and acts on that. An agent told *"structure is 400 ms stale"* behaves correctly. So every path that can lose information is required to say so:
+
+| Path | Guarantee |
+|---|---|
+| A capture that could not be taken | Reported as an explicit skip with a reason, never omitted from the payload |
+| A bounded channel dropping under backpressure | Drop is counted at the producer **and** surfaced on the next delivered item, so a consumer never silently misses events |
+| A capability that is unavailable | Exactly three answers — supported, unsupported with a reason, or degraded with a remedy. There is no fourth state and no silence |
+| A handle whose surface died | Returns an explicit gone-since marker, never an empty success |
+| A frame ring consumer falling behind | Emits an explicit gap count and resynchronises; a gap is reported, never hidden |
+| An AX walk hitting its depth or node ceiling | Sets `truncated_at` to `"depth"` or `"nodes"` and warns — no silent truncation |
+| A snapshot mixing sources | Image and structure carry the same generation and describe one atomic publish point. Facets that could not be captured at that instant are marked skipped, never stitched in from a different moment |
+
+The same rule governs the on-disk contract: every tick writes to a temp path and `rename()`s into place, atomic on APFS, so a reader never observes a partial write — and the ring retains the trailing raw evidence for any consumer that needs to look back, while the latest pair stays the hot read. Truncation in the hot payload is a *deferral*, not a deletion.
+
 ### Fork the machine, not just the browser
 
 `sandbox` gives each agent session an APFS-cloned profile under `sandbox-exec` confinement, with a retained base snapshot so divergent state can be three-way merged back to the host. Cloning is copy-on-write at the filesystem level, so a multi-gigabyte profile forks in well under a second at near-zero disk cost — which is what makes speculative, parallel agent work practical rather than theoretical.
+
+---
+
+## Where this is going: one contract, real depth
+
+242 flat methods across disjoint namespaces is the honest cost of covering everything. `page.click`, `app.click` and `term.mouse_event` are three universes that do the same thing. The next architecture collapses them without amputating any of the depth that made them separate.
+
+**The unification is not "everything is an element."** A cookie is not an element. A PTY cell is not a widget. A Bluetooth device is not clickable. Forcing them into one shape is how you lose depth — which is the exact failure the coverage mandate exists to prevent.
+
+Instead the contract unifies at five seams, and only five:
+
+| Seam | Design |
+|---|---|
+| **Addressing** | One URI-shaped handle namespace every provider mints and resolves — `glance://browser.cdp@sess-A/ctx-7/tab-3/frame-F12A9C`, `glance://term.pty@local/s-9`, `glance://system.macos@local/audio/output/…` |
+| **Perception** | A surface graph plus per-surface **facets**: typed, provider-declared, individually negotiated state bundles. `elements` is *one* facet. `cookies` is a facet. `grid` is a facet. `devices` is a facet |
+| **Action** | A small closed verb set every provider maps into, plus a schema-carrying `Op` escape hatch so no native capability is amputated by the abstraction |
+| **Observation** | One hierarchical topic namespace rooted at the handle, with a universal `state.changed` invalidation signal |
+| **Identity** | A three-tier `Handle` / `Ref` / `Anchor` split with an explicit resolution ladder — and a low-confidence match is never silently used, it returns ranked candidates instead |
+
+Facets are the load-bearing invention: the contract stays uniform, the *content* stays surface-native, and the agent negotiates which native truth it wants.
+
+```mermaid
+flowchart LR
+    AG["agent"] -->|"snapshot · act · subscribe"| RT["router<br/>handles · facets · verbs<br/>leases · budget · trace"]
+
+    RT --> P1["browser.cdp"]
+    RT --> P2["browser.bidi"]
+    RT --> P3["native.ax"]
+    RT --> P4["term.pty"]
+    RT --> P5["system.macos"]
+
+    P1 --> T1["Chromium · Edge<br/>Brave · Electron"]
+    P2 --> T2["Firefox · Safari<br/>standards-tracking"]
+    P3 --> T3["AppKit · SwiftUI<br/>menus · Spaces · Dock"]
+    P4 --> T4["PTY · VT model<br/>TUI as elements"]
+    P5 --> T5["CoreAudio · IOKit<br/>FSEvents · AVF"]
+
+    VS(["vision<br/>facet supplier, not a provider"]) -.->|"pixels · ocr onto<br/>any capture-capable surface"| RT
+
+    classDef r fill:#312e5f,stroke:#a78bfa,stroke-width:2px,color:#e5e7eb
+    classDef p fill:#1e3a5f,stroke:#60a5fa,color:#e5e7eb
+    classDef t fill:#1f2937,stroke:#4b5563,color:#9ca3af
+    classDef v fill:#14352b,stroke:#34d399,color:#e5e7eb
+    class RT r
+    class P1,P2,P3,P4,P5 p
+    class T1,T2,T3,T4,T5 t
+    class VS v
+```
+
+Three consequences worth stating outright:
+
+- **Perception is a read against a continuously maintained world model, not a synchronous probe.** Walking an accessibility tree on every perception tick does not scale — walk cost is set by how fast the *target application's* run loop services requests, not by node count. Synchronous probes are the fallback, not the default.
+- **Vision is a facet supplier, not a peer provider.** Making it a provider forces the agent to correlate two addressing schemes for the same pixels.
+- **The unit of parallelism is the target application, not the machine.** Accessibility calls are direct IPC to the target process, so N agents driving N different apps run genuinely concurrently at zero focus cost. That single fact is what makes the whole parallel model work, and it is why contention is arbitrated per app rather than globally.
+
+Safari is the design's own hardest test and the strongest validation of the multi-provider model: its BiDi implementation has no input module at all, so a surface can *find* an element and cannot *click* it. The answer is a composite surface — standards-based navigation and storage from one provider, elements and every verb from the native accessibility provider, composed onto one handle with the split declared in the capability set.
 
 ---
 
