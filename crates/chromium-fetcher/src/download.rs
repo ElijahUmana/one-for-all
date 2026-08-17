@@ -635,7 +635,6 @@ mod tests {
                 let counter = counter.clone();
                 let beh = behavior.clone();
                 tokio::spawn(async move {
-                    let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
                     let req = match read_request(&mut sock).await {
                         Some(r) => r,
                         None => return,
@@ -650,6 +649,12 @@ mod tests {
                         let _ = sock.write_all(resp.as_bytes()).await;
                         return;
                     }
+
+                    // Count body-serving requests only. `download_zip` HEADs the
+                    // URL first to size it, and counting that probe as attempt 1
+                    // meant every `n == 1` behaviour below fired against the HEAD
+                    // — which returns above — and never against the real GET.
+                    let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
 
                     match beh {
                         Behavior::Ok => {
