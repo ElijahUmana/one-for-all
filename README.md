@@ -147,26 +147,25 @@ The agent never needs to know which plane answers. `page.click`, `app.menu.click
 Every agent session runs its own MCP server. Those servers race for a lock; the winner becomes the broker daemon and the rest become its clients. There is no separate service to start and no port to collide on.
 
 ```mermaid
-flowchart LR
-    S1["session A"] -->|"stdio<br/>LSP framed"| M1["mcp-server"]
-    S2["session B"] -->|"stdio"| M2["mcp-server"]
-    S3["session N"] -->|"stdio"| M3["mcp-server"]
+flowchart TB
+    S1["session A"] --> M1["mcp-server"]
+    S2["session B"] --> M2["mcp-server"]
+    S3["session N"] --> M3["mcp-server"]
 
-    M1 -->|"wins flock"| BK(("broker<br/>daemon"))
-    M2 -->|"loses → client"| SK[["broker.sock<br/>JSON-RPC 2.0<br/>16MB cap"]]
+    M1 -->|"wins the flock"| BK
+    M2 -->|"loses → client"| SK
     M3 -->|"loses → client"| SK
-    SK --> BK
 
-    BK --> RG["SessionRegistry<br/>+ router<br/>+ crash recovery<br/>+ trace"]
+    SK[["broker.sock · JSON-RPC 2.0 · 16MB cap"]] --> BK
+
+    BK(("broker daemon")) --> RG["SessionRegistry · router<br/>crash recovery · trace"]
 
     RG --> BE["browser-engine"]
-    RG --> OT["native · terminal<br/>system · vision<br/>sandbox"]
+    RG --> OT["native · terminal · system<br/>vision · sandbox"]
 
-    BE -->|"CDP · NUL framed<br/>fd 3/4 · 100MB cap"| C1["Chromium A<br/>own user-data-dir"]
-    BE --> C2["Chromium B<br/>own user-data-dir"]
-    BE --> C3["Chromium N<br/>own user-data-dir"]
+    BE -->|"CDP · NUL framed · fd 3/4 · 100MB cap"| CH["Chromium child per session<br/>own --user-data-dir"]
 
-    FM(["focus-manager<br/>NSWorkspace guardian"]) -.->|"save/restore<br/>frontmost"| C1
+    FM(["focus-manager · NSWorkspace guardian"]) -.->|"save / restore frontmost"| CH
     FM -.-> OT
 
     classDef sess fill:#1f2937,stroke:#4b5563,color:#9ca3af
@@ -176,7 +175,7 @@ flowchart LR
     class S1,S2,S3,M1,M2,M3 sess
     class BK,RG,SK core
     class BE,OT,FM eng
-    class C1,C2,C3 krom
+    class CH krom
 ```
 
 **Three transports, three framings, deliberately.** MCP stdio is LSP-framed (8KB header cap). The broker socket is newline-delimited JSON-RPC 2.0 (16MB cap). CDP is NUL-delimited over `--remote-debugging-pipe` on fd 3/fd 4 (100MB cap) — no port, no localhost firewall prompt, no WebSocket upgrade. Per-target channels are bounded at 1024; backpressure drops oldest and increments a metric rather than ever blocking the CDP reader.
