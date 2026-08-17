@@ -30,9 +30,9 @@ The invariants that hold across all six:
 
 ### Where the isolation boundary actually ends
 
-The isolation boundary is genuine for the filesystem, browser storage, processes, PTYs, frame rings, traces, and accessibility scope.
+The isolation boundary holds for the filesystem, browser storage, processes, PTYs, frame rings, traces, and accessibility scope.
 
-It is **not** genuine — and cannot be made genuine on macOS — for the frontmost application, the hardware cursor, the general pasteboard, the WindowServer window list, the audio output device, or TCC grants. Those are global and mutable. They are not isolated; they are **arbitrated**. Any claim of "full isolation" that does not carve them out is false.
+It does **not** hold — and cannot be made to hold on macOS — for the frontmost application, the hardware cursor, the general pasteboard, the WindowServer window list, the audio output device, or TCC grants. Those are global and mutable. They are not isolated; they are **arbitrated**. Any claim of "full isolation" that does not carve them out is false.
 
 ### No silent loss
 

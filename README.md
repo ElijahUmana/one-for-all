@@ -21,7 +21,7 @@ Install once. Every agent session in every terminal gets the full surface automa
 
 **1 — Perception is continuous.** One always-current world model, published atomically and read in constant time. The agent never pays to look.
 
-**2 — Coverage is total.** Every sub-granularity of every surface is reachable, and anything that genuinely is not says so out loud rather than returning a plausible empty.
+**2 — Coverage is total.** Every sub-granularity of every surface is reachable, and anything that is not says so out loud rather than returning a plausible empty.
 
 The first makes an agent fast and never stale. The second makes it able to finish the job instead of stalling one step from the end. Everything below follows from those two.
 
@@ -102,7 +102,7 @@ The usual way to scope an automation surface is to cover the obvious 80% and han
 
 So the principle is the opposite of graceful degradation: **every sub-granularity of every surface is reachable**, enumerated as a contract before it was built rather than grown as features were requested.
 
-That commitment only means something paired with the no-silent-loss rule. An agent that hits an uncovered hole does not stop — it does the wrong thing confidently. So the two halves are inseparable: **reach everything, and where something genuinely cannot be reached, say so out loud instead of returning a plausible empty.** Coverage without that is worse than no coverage, because it converts a visible gap into a silent wrong answer.
+That commitment only means something paired with the no-silent-loss rule. An agent that hits an uncovered hole does not stop — it does the wrong thing confidently. So the two halves are inseparable: **reach everything, and where something cannot be reached, say so out loud instead of returning a plausible empty.** Coverage without that is worse than no coverage, because it converts a visible gap into a silent wrong answer.
 
 **242 methods across 14 families** is what closing that gap actually costs. The full map — including the deep-input, deep-state, deep-network and sub-granularity vision surfaces most stacks never expose — is [below](#the-capability-surface).
 
@@ -371,7 +371,7 @@ Three consequences worth stating outright:
 
 - **Perception is a read against a continuously maintained world model, not a synchronous probe.** Walking an accessibility tree on every perception tick does not scale — walk cost is set by how fast the *target application's* run loop services requests, not by node count. Synchronous probes are the fallback, not the default.
 - **Vision is a facet supplier, not a peer provider.** Making it a provider forces the agent to correlate two addressing schemes for the same pixels.
-- **The unit of parallelism is the target application, not the machine.** Accessibility calls are direct IPC to the target process, so N agents driving N different apps run genuinely concurrently at zero focus cost. That single fact is what makes the whole parallel model work, and it is why contention is arbitrated per app rather than globally.
+- **The unit of parallelism is the target application, not the machine.** Accessibility calls are direct IPC to the target process, so N agents driving N different apps run concurrently at zero focus cost. That single fact is what makes the whole parallel model work, and it is why contention is arbitrated per app rather than globally.
 
 Safari is the design's own hardest test and the strongest validation of the multi-provider model: its BiDi implementation has no input module at all, so a surface can *find* an element and cannot *click* it. The answer is a composite surface — standards-based navigation and storage from one provider, elements and every verb from the native accessibility provider, composed onto one handle with the split declared in the capability set.
 
