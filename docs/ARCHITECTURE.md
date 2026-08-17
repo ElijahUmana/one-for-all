@@ -8,15 +8,44 @@
 
 ## What this is
 
-A standalone, owned-end-to-end browser-automation stack for Claude Code on macOS.
+A machine-control plane for AI agents on macOS, owned end to end. Not a browser driver — a broker that spans six control planes behind one JSON-RPC contract.
 
-- Multiple concurrent `claude` sessions each own their own Chromium tabs.
-- True parallel — sessions never block on each other.
-- Zero focus-steal from the user's foreground app, by construction.
-- Per-session full OS-level isolation: cookies, IndexedDB, service workers, GPU shader cache — nothing crosses session boundaries because nothing crosses process boundaries.
-- Tabs persist across session exits.
-- No dependence on the Anthropic Chrome extension. No copy-paste pairing.
-- Innate integration: install once → every `claude` session in any terminal automatically gets browser tools.
+| Plane | Mechanism | Families |
+|---|---|---|
+| Browser | CDP over `--remote-debugging-pipe`, one Chromium child per session | `browser` `tab` `page` `net` |
+| Native apps | macOS Accessibility API, plus AppKit/CGS surfaces AX alone cannot reach | `app` `clipboard` `drag` |
+| Terminal | Real PTY with a parser-maintained screen model | `term` |
+| System | CoreAudio, IOKit, AVFoundation, FSEvents, SystemConfiguration, libproc | `system` |
+| Vision | Continuous capture, diffing, detection over a shared-memory frame ring | `vision` |
+| Isolation | APFS clone per session under `sandbox-exec`, three-way merge back | — |
+
+The invariants that hold across all six:
+
+- **Multiple concurrent agent sessions run truly in parallel.** Sessions never block on each other.
+- **Zero focus-steal from the user's foreground app, by construction** — five layers of defence, with the focus-stealing AppKit surface confined to one crate and enforced at compile time.
+- **Per-session OS-level isolation.** Cookies, IndexedDB, service workers, GPU shader cache, PTYs and spawned processes do not cross session boundaries, because they do not cross process boundaries.
+- **Nothing is lost silently.** Every skipped facet, dropped event, truncated walk, degraded capability and stale observation is reported to the caller rather than rendered as a plausible-looking empty result. See "No silent loss" below.
+- **Browser tabs persist across session exits**, via real `--user-data-dir` persistence rather than cooperative state restore.
+- **Install once** → every agent session in any terminal gets the full surface, with no pairing and no per-project configuration.
+
+### Honest statement of where isolation ends
+
+The isolation boundary is genuine for the filesystem, browser storage, processes, PTYs, frame rings, traces, and accessibility scope.
+
+It is **not** genuine — and cannot be made genuine on macOS — for the frontmost application, the hardware cursor, the general pasteboard, the WindowServer window list, the audio output device, or TCC grants. Those are global and mutable. They are not isolated; they are **arbitrated**. Any claim of "full isolation" that does not carve them out is false.
+
+### No silent loss
+
+The failure this design treats as worst is not an error but a convincing empty result: an agent handed `[]` concludes the screen is empty and acts on it.
+
+- A capture that could not be taken is reported as an explicit skip with a reason — never omitted.
+- A bounded channel dropping under backpressure counts the drop at the producer **and** surfaces it on the next delivered item.
+- A capability is supported, unsupported with a reason, or degraded with a remedy. There is no fourth state and no silence.
+- A surface that died returns an explicit gone marker, not an empty success.
+- An AX walk hitting its depth or node ceiling sets `truncated_at` and warns.
+- Image and structure in one snapshot share a generation and one atomic publish point; a facet that could not be captured at that instant is marked skipped rather than stitched in from another moment.
+
+Ring writes go to a temp path and `rename()` into place — atomic on APFS — so a reader never sees a partial write, and the trailing raw history stays on disk as evidence. Truncation in the hot payload is a deferral, not a deletion.
 
 ---
 
@@ -72,9 +101,15 @@ For framing details see `docs/PROTOCOL.md`.
 | `focus-manager` | macOS spawn-without-focus-steal, frontmost save+restore actor | guardian actor on a tokio task | per Chromium spawn |
 | `browser-engine` | Browser singleton-per-session, BrowserContext, Page, action dispatch, wait predicates, stealth bundle, network/locale emulation | per-Browser tokio runtime sub-tree | per session |
 | `terminal-control` | PTY-backed terminal sessions, bounded raw output ring, parser-maintained screen snapshots, scrollback, resize/signal/mouse injection | blocking PTY reader + async exit watcher per terminal | per broker session |
+| `native-control` | macOS Accessibility surface: windows, menus, Dock, Spaces, Spotlight, Notification Center, status menu, IME, AppleScript/JXA, clipboard, cross-app drag | per-subscription run-loop thread; sync AX calls with an explicit messaging timeout | per watched app |
+| `system-control` | Audio in/out and capture, mic, camera, battery, Bluetooth, USB, displays and region capture, network interfaces/routes/connections, process list/info/signal, FSEvents, Spotlight metadata | sync framework calls; FSEvents stream thread; permission-gated with a stub backend where unavailable | per call, plus long-lived watches |
+| `vision` | Continuous capture, SIMD tile-hash diffing, OCR, detection and classification over an `mmap` frame ring | capture task + bounded work queue + pipeline task | per subscribed surface |
+| `sandbox` | Per-session APFS clone, `sandbox-exec` profile generation, retained base snapshot, three-way merge back to host | sync clone; merge is an explicit operator action | per session |
 | `broker` | unix socket server, `SessionRegistry`, JSON-RPC router, event sink, lifecycle FSM, crash recovery, trace recorder | accept loop + per-conn task + per-session task + crash watcher | daemon |
 | `mcp-server` | stdio MCP loop, tool dispatch, `broker_client` (auto-spawn-on-missing) | per stdio: 1 reader + 1 writer + N tool tasks | per CLI session |
 | `installer` | `install.sh`, plist, atomic `~/.claude.json` merge, `doctor.sh` | shell scripts | one-shot |
+| `ofa-cli` | Operator CLI — `spawn`, `list`, `attach`, `merge`, `kill`, `logs` | one-shot, talks to the broker over the socket | per invocation |
+| `bench` | Latency and throughput SLO gates, asserted rather than reported | criterion harness | CI |
 | `observability` | `tracing-subscriber`, log dirs, metrics registry | sync init, async metric writers | embedded in broker + mcp-server |
 
 ---
@@ -236,6 +271,41 @@ The hard cap prevents an agent loop from OOMing the host; the soft CPU cap means
 The broker itself does NOT set RLIMIT — it's the parent and needs to live.
 
 ---
+
+## The native plane
+
+Accessibility is the ground truth for a well-behaved AppKit or SwiftUI app: roles, values, available actions, hierarchy, geometry, text ranges, and change notifications. Where an element is semantically actionable, performing its action beats a synthetic click on every axis — no coordinates, no occlusion sensitivity, no focus steal, and it works on background and partially-offscreen windows.
+
+Input therefore uses a ladder, not a single mechanism, ordered by focus impact:
+
+1. **Perform the element's own accessibility action** — no coordinates, no focus change. The default.
+2. **Per-pid event posting** — targeted input that does not activate the application.
+3. **Global event tap** — moves the real cursor and is visible to the user. Last resort, and gated.
+
+Several surfaces are not reachable from the accessibility API at all — Spaces and Mission Control, global window z-order, some menu-bar extras. Those go through documented AppKit and window-server queries, with AppleScript and JavaScript-for-Automation as the escape hatch for applications that expose a scripting dictionary and nothing else.
+
+Every AX call carries an explicit messaging timeout. The default is long enough to wedge an agent loop, and a wedged target application blocks the calling thread with no cancellation primitive — so the timeout is set, always, and a timeout is reported as a timeout rather than as an empty tree.
+
+## The terminal plane
+
+A real PTY, not a pipe: programs that check `isatty` behave normally and full-screen applications work.
+
+A blocking reader feeds a bounded raw ring while a parser maintains the screen. Callers ask for the rendered screen — cells, attributes, cursor, alternate-screen state — instead of replaying escape sequences themselves. Scrollback is a ring the parser maintains; resize goes through `TIOCSWINSZ`; signals are delivered to the foreground process group; xterm mouse sequences can be injected.
+
+Two properties fall out of owning the PTY rather than scraping a terminal window:
+
+- **A TUI becomes a first-class surface.** `vim`, `htop`, `less`, an interactive rebase and a curses installer are user interfaces, and the parsed grid is what makes them addressable rather than a wall of bytes.
+- **Echo state is a reliable secret detector.** When the terminal disables echo, the prompt is a password prompt. That classification is free and no screen-scraping approach can match it.
+
+Every PTY session inherits its session's sandbox policy.
+
+## The system plane
+
+Device and OS state has **no elements facet, and that is deliberate**. An agent querying an audio output device sees no click verb and no element tree, so it never tries. Being honest about a surface being non-UI is what keeps the unified contract from flattening into a lie.
+
+Each domain maps to a specific framework — CoreAudio for devices and volume, AVFoundation for capture, IOKit for USB and power, CoreBluetooth for radios, SystemConfiguration and `libproc` for network and processes, FSEvents for filesystem watches, and the metadata query API for Spotlight. Screen capture uses the current ScreenCaptureKit path; the older CoreGraphics capture entry points are obsoleted, not merely deprecated, and do not build against a modern deployment target.
+
+Permission-gated capabilities — camera, microphone, screen recording, Bluetooth — are checked without prompting where the platform allows it, and prompt on first use otherwise. One subtlety governs how permissions are granted at all: the system attributes a permission not to the process that called, but to the *responsible* process up the launch chain. A binary launched from a terminal inherits that terminal as responsible, so the grant lands on the terminal rather than on the tool.
 
 ## Threading and channels (SPEC D16)
 
