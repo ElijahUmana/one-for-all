@@ -73,6 +73,18 @@ An agent told "structure is 400 ms stale" behaves correctly. An agent handed a s
 
 ---
 
+## Total coverage, by design
+
+The second principle is as load-bearing as the first: **there is no browser interaction, no computer action, and no visual detail at any level of sub-granularity that an agent should be unable to reach.** Not "the common cases plus an escape hatch" — the whole surface, enumerated as a contract before it was built.
+
+This is a deliberate rejection of how automation stacks normally scope themselves. They cover the obvious 80% of a surface and leave the rest to shelling out, injecting a script, or screenshotting and guessing. But the missing 20% is where real work actually lives: the CJK composition event, the file dropped *into* a page rather than onto the app, the service worker that has to be triggered by hand, the Bluetooth radio, the alternate-screen curses app, the modal that appeared and was never announced to the accessibility tree, the element inside a cross-origin iframe whose coordinates are in a different document's space.
+
+An agent that hits one of those holes does not degrade gracefully. It does the wrong thing confidently — which is why coverage and the no-silent-loss contract are the same commitment viewed from two sides: reach everything, and when something genuinely cannot be reached, say so out loud rather than returning a plausible empty.
+
+**242 methods across 14 families** exist to close that gap, mapped surface by surface in the coverage table below.
+
+---
+
 ## Six control planes, one protocol
 
 A browser driver sees only the browser. A screenshot loop sees only pixels. A shell sees only the shell. one-for-all puts all of them behind one broker, so an agent filling a web form can also read the Finder window behind it, watch a build log in a PTY, check whether the screen has stopped animating, and fork its own state to try two approaches at once.
