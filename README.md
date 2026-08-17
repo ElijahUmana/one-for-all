@@ -17,15 +17,59 @@ Install once. Every agent session in every terminal gets the full surface automa
 
 ---
 
-## The mandate: no blind spots
+## Continuous perception
 
-The system was specified against one requirement:
+**This is the primitive everything else is built on.** Every other computer-use stack re-derives the world before each action:
 
-> There should be no sort of browser page, no sort of internet page, no sort of computer action, no sort of vision in any type of sub-granularity in any way that should not be possible.
+```
+list apps → list windows → walk the accessibility tree → screenshot
+          → guess coordinates → click → screenshot → re-reason → repeat
+```
 
-Every other design choice here falls out of that. Most automation stacks cover the obvious 80% of a surface and leave the rest to "escape hatches" — shell out, inject a script, take a screenshot and guess. The remaining 20% is where real work actually lives: the CJK composition event, the file dropped *into* a web page, the service worker that has to be triggered by hand, the Bluetooth radio, the alternate-screen curses app, the modal that appeared but was never announced to the accessibility tree.
+That loop is paid *per action*, and between actions the model is blind. Walking an accessibility tree is not cheap and its cost is not a function of node count — it is set by how fast the **target application's** run loop services requests, which is why a heavy app can take seconds to enumerate while a light one takes tens of milliseconds. Putting that walk on the critical path of every click is what makes conventional agents slow and, worse, stale.
 
-**242 RPC methods across 14 families** exist to close that gap. Not a plugin surface — one enumerated contract, specified before it was built.
+So perception here is **not a probe**. Five streams run continuously, in parallel, and never block each other; they are fused into one always-current world model that is published atomically and read in constant time.
+
+```mermaid
+flowchart LR
+    S1["<b>AX observers</b><br/>push notifications<br/>not polling"] --> WM
+    S2["<b>Window capture</b><br/>per-window streams<br/>change-only frames"] --> WM
+    S3["<b>App lifecycle</b><br/>launch · quit · activate<br/>mounts observers dynamically"] --> WM
+    S4["<b>Window server</b><br/>cross-Space enumeration<br/>global z-order"] --> WM
+    S5["<b>Input + cursor</b><br/>position · recent history"] --> WM
+
+    WM["<b>World model</b><br/>copy-on-write snapshot<br/>─────────<br/>scene graph per app/window<br/>actionable elements with<br/>pre-computed coordinates<br/>latest frame per surface<br/>recent change events"]
+
+    WM -->|"one generation<br/>one atomic publish"| RING[["ring on disk<br/>trailing raw evidence<br/>+ hot latest pair"]]
+
+    RING --> R1["agent reads<br/>constant time"]
+    RING --> R2["vision facets<br/>diff · stability · OCR"]
+
+    classDef s fill:#1e3a5f,stroke:#60a5fa,color:#e5e7eb
+    classDef w fill:#312e5f,stroke:#a78bfa,stroke-width:2px,color:#e5e7eb
+    classDef r fill:#14352b,stroke:#34d399,color:#e5e7eb
+    classDef o fill:#1f2937,stroke:#4b5563,color:#9ca3af
+    class S1,S2,S3,S4,S5 s
+    class WM w
+    class RING r
+    class R1,R2 o
+```
+
+The agent never pays for a walk. It reads a model that is already current.
+
+**Why this is what makes vision continuous.** Because structure and pixels are captured under *one generation and one atomic publish point*, vision stops being a separate screenshot the agent has to request and becomes a **facet of the same observation** the scene graph came from. That is the difference between a screenshot tool and a perception layer, and it is what makes the vision surface meaningful at all — `vision.stability`, `vision.compare`, `vision.loading.detect`, `vision.find_text`, `vision.diff.semantic` are reads against a stream that is already running, correlated with the elements in the same frame. Ask whether the screen has settled and the answer comes from a diff that was already computed, not from two screenshots taken on demand and hoped to be comparable.
+
+That coupling is also a hard contract, not a convention:
+
+| Coherence | Meaning |
+|---|---|
+| **Coherent** | Frame and structure captured within a bounded skew. Element refs align with pixels. |
+| **Skewed** | Structure is stale by a stated amount — **and the agent is told the number** |
+| **Degraded** | Pixels only, with the reason |
+
+An agent told "structure is 400 ms stale" behaves correctly. An agent handed a silent empty tree concludes the screen is blank and acts on it. Publishing is atomic — write to a temp path, `rename()` into place — so a reader never observes a half-written world, and the ring keeps the trailing raw history as evidence while the latest pair stays the hot read.
+
+**A perception layer, not an intent layer.** The model is handed everything — every element, every coordinate, the current frame, the recent changes — and does its own reasoning. There is no "click the Submit button" semantic shortcut interpreting on its behalf. The verbs stay primitive and the model supplies every parameter from what it sees.
 
 ---
 
