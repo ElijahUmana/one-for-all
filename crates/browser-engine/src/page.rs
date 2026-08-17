@@ -241,7 +241,7 @@ impl Page {
 
         // SPEC §10 M2 — install the MutationObserver bootstrap. Idempotent:
         // re-running on the same document is a no-op (the JS guards on
-        // `window.__claudeBridgeMutationInstalled`). On every subsequent
+        // `window.__oneForAllMutationInstalled`). On every subsequent
         // top-frame navigation Chromium re-runs the registered bootstrap
         // automatically against the new document. Must run AFTER
         // `Runtime.enable` because the helper uses `Runtime.evaluate` to

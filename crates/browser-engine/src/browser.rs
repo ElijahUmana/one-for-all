@@ -579,7 +579,7 @@ fn build_session_storage_seed_script(entries: &[sandbox::StorageEntry]) -> Optio
     }
     let map_json = serde_json::to_string(&grouped).ok()?;
     Some(format!(
-        "(() => {{\n  if (window.__claudeBridgeSessionSeedInstalled) return;\n  window.__claudeBridgeSessionSeedInstalled = true;\n  const seeds = {map_json};\n  const apply = () => {{\n    try {{\n      const origin = location.origin;\n      const entries = seeds[origin];\n      if (!entries) return;\n      for (const [k, v] of entries) sessionStorage.setItem(k, v);\n      delete seeds[origin];\n    }} catch (_e) {{}}\n  }};\n  apply();\n  addEventListener('DOMContentLoaded', apply, {{ once: true }});\n}})();"
+        "(() => {{\n  if (window.__oneForAllSessionSeedInstalled) return;\n  window.__oneForAllSessionSeedInstalled = true;\n  const seeds = {map_json};\n  const apply = () => {{\n    try {{\n      const origin = location.origin;\n      const entries = seeds[origin];\n      if (!entries) return;\n      for (const [k, v] of entries) sessionStorage.setItem(k, v);\n      delete seeds[origin];\n    }} catch (_e) {{}}\n  }};\n  apply();\n  addEventListener('DOMContentLoaded', apply, {{ once: true }});\n}})();"
     ))
 }
 

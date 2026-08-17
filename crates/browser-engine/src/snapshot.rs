@@ -193,7 +193,7 @@ impl Page {
     ///   anchor (gap detected: smallest drained seq > anchor +1).
     /// - The drain transport call failed.
     /// - The drain JSON failed to parse (e.g. an SPA clobbered
-    ///   `window.__claudeBridgeMutationDrain`); recorded in
+    ///   `window.__oneForAllMutationDrain`); recorded in
     ///   `mutation_metrics().drain_failures`.
     ///
     /// Special case: `since_seq == 0` is "initial call, no anchor yet"
@@ -593,7 +593,7 @@ fn remix_stable_id_with_frame(id: &str, frame_id: &str) -> String {
     hex::encode(h.finalize())
 }
 
-/// SPEC §10 M2 — drain `window.__claudeBridgeMutationLog` via the
+/// SPEC §10 M2 — drain `window.__oneForAllMutationLog` via the
 /// `ax_engine` helper and return the highest seq seen (or `0` if the
 /// log was empty / drain failed). Internal helper used by `snapshot()`
 /// to anchor the high-water mark. Failures are intentionally swallowed

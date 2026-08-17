@@ -155,7 +155,7 @@ The lint config lives in `clippy.toml` at the workspace root (`disallowed-method
 
 `page.snapshot {since_seq: N}` returns only elements that changed since `snapshot_seq=N`.
 
-1. A `MutationObserver` is bootstrapped on every new document via `Page.addScriptToEvaluateOnNewDocument`. It writes records into `window.__claudeBridgeMutationLog`.
+1. A `MutationObserver` is bootstrapped on every new document via `Page.addScriptToEvaluateOnNewDocument`. It writes records into `window.__oneForAllMutationLog`.
 2. The broker drains the log on each delta call via `Runtime.evaluate`, scoped per `(tab_id, snapshot_seq)`.
 3. The result is a `Snapshot` with the same shape as a full one, but `elements[]` only contains nodes whose `ref` mutated.
 4. `snapshot_seq` is monotonic. The broker stores per-`(session, tab)` last-seq for tombstone resolution (closed elements between snapshots).

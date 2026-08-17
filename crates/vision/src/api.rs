@@ -767,7 +767,7 @@ mod tests {
                     w: 100,
                     h: 20,
                 },
-                text: "Welcome to Claude Bridge".into(),
+                text: "Welcome to one-for-all".into(),
                 confidence: 0.99,
             }],
         );
@@ -786,7 +786,7 @@ mod tests {
         );
         let r = p
             .find_text(TextQuery {
-                query: "claude".into(),
+                query: "one-for-all".into(),
                 is_regex: false,
                 region: None,
             })

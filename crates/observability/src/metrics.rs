@@ -502,7 +502,7 @@ pub fn perf_metrics() -> &'static PerfMetrics {
 pub struct MutationMetrics {
     /// Times `drain_log` returned `Err(MutationError::ParseError)` —
     /// most often because the page replaced
-    /// `window.__claudeBridgeMutationDrain` with something that didn't
+    /// `window.__oneForAllMutationDrain` with something that didn't
     /// deserialize as `Vec<MutationRecord>`.
     pub drain_failures: AtomicU64,
     /// Times the snapshot delta path detected a sequence-number gap

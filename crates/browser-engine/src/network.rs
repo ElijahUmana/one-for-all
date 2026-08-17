@@ -883,11 +883,11 @@ impl Page {
             return Ok(());
         }
         const WS_REGISTRY_BOOTSTRAP: &str = r#"(() => {
-            if (globalThis.__claudeBridgeWSInstalled) return true;
-            const registry = Array.isArray(globalThis.__claudeBridgeWS)
-                ? globalThis.__claudeBridgeWS
+            if (globalThis.__oneForAllWSInstalled) return true;
+            const registry = Array.isArray(globalThis.__oneForAllWS)
+                ? globalThis.__oneForAllWS
                 : [];
-            Object.defineProperty(globalThis, '__claudeBridgeWS', {
+            Object.defineProperty(globalThis, '__oneForAllWS', {
                 configurable: true,
                 enumerable: false,
                 writable: true,
@@ -900,12 +900,12 @@ impl Page {
             class OneForAllWebSocket extends OriginalWebSocket {
                 constructor(...args) {
                     super(...args);
-                    const reg = globalThis.__claudeBridgeWS;
+                    const reg = globalThis.__oneForAllWS;
                     if (Array.isArray(reg) && !reg.includes(this)) {
                         reg.push(this);
                     }
                     const drop = () => {
-                        const regNow = globalThis.__claudeBridgeWS;
+                        const regNow = globalThis.__oneForAllWS;
                         if (!Array.isArray(regNow)) return;
                         const idx = regNow.indexOf(this);
                         if (idx >= 0) regNow.splice(idx, 1);
@@ -918,7 +918,7 @@ impl Page {
             }
             Object.defineProperty(OneForAllWebSocket, 'name', { value: 'WebSocket' });
             globalThis.WebSocket = OneForAllWebSocket;
-            globalThis.__claudeBridgeWSInstalled = true;
+            globalThis.__oneForAllWSInstalled = true;
             return true;
         })();"#;
 
@@ -957,7 +957,7 @@ impl Page {
     ///
     /// **Limitation:** CDP has no first-class "send WS frame" command.
     /// We fall back to `Runtime.evaluate` against a JS shim that walks
-    /// `window.__claudeBridgeWS`.
+    /// `window.__oneForAllWS`.
     pub async fn net_websocket_inject_frame(
         &self,
         url_substring: &str,
@@ -973,7 +973,7 @@ impl Page {
         let url_json = serde_json::to_string(url_substring).unwrap_or_else(|_| "\"\"".to_owned());
         let expr = format!(
             r#"(() => {{
-                const reg = (window.__claudeBridgeWS || []);
+                const reg = (window.__oneForAllWS || []);
                 const target = reg.find(w => w && w.url && w.url.indexOf({url_json}) >= 0);
                 if (!target) return {{ ok: false, reason: "no-matching-ws" }};
                 if (target.readyState !== WebSocket.OPEN) {{

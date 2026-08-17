@@ -8,7 +8,7 @@
 //! `BENCH_SANDBOX_V3=1`. When unset it emits a `BENCH_RESULT` line with
 //! `kind: "skipped"` and `passed: true` plus a stderr WARN —
 //! `scripts/ci-bench-gate.sh` surfaces a tracked WARN in the CI output.
-//! No silent skip per the "no silent caps" rule in CLAUDE.md.
+//! Never a silent skip: an unrun gate must be visible in CI output.
 
 use std::time::Instant;
 
