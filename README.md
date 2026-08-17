@@ -102,7 +102,7 @@ The usual way to scope an automation surface is to cover the obvious 80% and han
 
 So the principle is the opposite of graceful degradation: **every sub-granularity of every surface is reachable**, enumerated as a contract before it was built rather than grown as features were requested.
 
-That commitment only means something paired with the first principle's honesty rule. An agent that hits an uncovered hole does not stop — it does the wrong thing confidently. So the two halves are inseparable: **reach everything, and where something genuinely cannot be reached, say so out loud instead of returning a plausible empty.** Coverage without that is worse than no coverage, because it converts a visible gap into a silent wrong answer.
+That commitment only means something paired with the no-silent-loss rule. An agent that hits an uncovered hole does not stop — it does the wrong thing confidently. So the two halves are inseparable: **reach everything, and where something genuinely cannot be reached, say so out loud instead of returning a plausible empty.** Coverage without that is worse than no coverage, because it converts a visible gap into a silent wrong answer.
 
 **242 methods across 14 families** is what closing that gap actually costs. The full map — including the deep-input, deep-state, deep-network and sub-granularity vision surfaces most stacks never expose — is [below](#the-capability-surface).
 
@@ -323,7 +323,7 @@ The same rule governs the on-disk contract: every tick writes to a temp path and
 
 ## Where this is going: one contract, real depth
 
-242 flat methods across disjoint namespaces is the honest cost of covering everything. `page.click`, `app.click` and `term.mouse_event` are three universes that do the same thing. The next architecture collapses them without amputating any of the depth that made them separate.
+242 flat methods across disjoint namespaces is the real cost of covering everything. `page.click`, `app.click` and `term.mouse_event` are three universes that do the same thing. The next architecture collapses them without amputating any of the depth that made them separate.
 
 **The unification is not "everything is an element."** A cookie is not an element. A PTY cell is not a widget. A Bluetooth device is not clickable. Forcing them into one shape is how you lose depth — which is the exact failure the coverage mandate exists to prevent.
 

@@ -28,7 +28,7 @@ The invariants that hold across all six:
 - **Browser tabs persist across session exits**, via real `--user-data-dir` persistence rather than cooperative state restore.
 - **Install once** → every agent session in any terminal gets the full surface, with no pairing and no per-project configuration.
 
-### Honest statement of where isolation ends
+### Where the isolation boundary actually ends
 
 The isolation boundary is genuine for the filesystem, browser storage, processes, PTYs, frame rings, traces, and accessibility scope.
 
@@ -301,7 +301,7 @@ Every PTY session inherits its session's sandbox policy.
 
 ## The system plane
 
-Device and OS state has **no elements facet, and that is deliberate**. An agent querying an audio output device sees no click verb and no element tree, so it never tries. Being honest about a surface being non-UI is what keeps the unified contract from flattening into a lie.
+Device and OS state has **no elements facet, and that is deliberate**. An agent querying an audio output device sees no click verb and no element tree, so it never tries. Declaring a surface non-UI is what keeps the unified contract from flattening into a lie.
 
 Each domain maps to a specific framework — CoreAudio for devices and volume, AVFoundation for capture, IOKit for USB and power, CoreBluetooth for radios, SystemConfiguration and `libproc` for network and processes, FSEvents for filesystem watches, and the metadata query API for Spotlight. Screen capture uses the current ScreenCaptureKit path; the older CoreGraphics capture entry points are obsoleted, not merely deprecated, and do not build against a modern deployment target.
 
