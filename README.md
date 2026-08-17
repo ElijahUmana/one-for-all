@@ -1,5 +1,10 @@
 # one-for-all
 
+[![CI](https://github.com/ElijahUmana/one-for-all/actions/workflows/ci.yml/badge.svg)](https://github.com/ElijahUmana/one-for-all/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-lightgrey.svg)](#requirements)
+[![Rust](https://img.shields.io/badge/rust-1.78%2B-orange.svg)](https://www.rust-lang.org)
+
 **One control plane for the whole machine.** Browser, native macOS apps, terminals, system hardware, and a continuous vision pipeline — behind a single JSON-RPC surface, driven by any number of AI agent sessions in parallel, with OS-level isolation and zero focus-steal.
 
 ```bash
@@ -12,33 +17,37 @@ Install once. Every agent session in every terminal gets the full surface automa
 
 ---
 
-## What this actually is
+## Six control planes, one protocol
 
-Most "computer use" stacks give an agent one narrow window onto the machine: a browser driver, or a screenshot-and-click loop, or a shell. Each is blind to the others. An agent that fills a web form cannot read the Finder window behind it, cannot watch a build log in a PTY, cannot tell whether the screen has stopped animating, and cannot fork its own state to try two approaches at once.
-
-one-for-all collapses those into **one broker with one protocol**, spanning six control planes:
+A browser driver sees only the browser. A screenshot loop sees only pixels. A shell sees only the shell. one-for-all puts all of them behind one broker, so an agent filling a web form can also read the Finder window behind it, watch a build log in a PTY, check whether the screen has stopped animating, and fork its own state to try two approaches at once.
 
 ```mermaid
-flowchart TB
-    AGENT["AI agent session"]
+flowchart LR
+    A["AI agent<br/>session"] --> K(("broker<br/>242 methods"))
 
-    subgraph PLANES["Six control planes, one JSON-RPC surface"]
-        direction LR
-        B["<b>Browser</b><br/>CDP over pipe<br/>browser · tab · page · net<br/>116 methods"]
-        N["<b>Native apps</b><br/>Accessibility API<br/>app · clipboard · drag<br/>54 methods"]
-        T["<b>Terminal</b><br/>PTY + parser<br/>term<br/>12 methods"]
-        S["<b>System</b><br/>OS + hardware<br/>system<br/>25 methods"]
-        V["<b>Vision</b><br/>continuous capture<br/>vision<br/>22 methods"]
-        X["<b>Isolation</b><br/>APFS fork + sandbox<br/>per-session confinement"]
-    end
+    K --> BR["<b>Browser</b> · 116<br/>browser tab page net"]
+    K --> NA["<b>Native apps</b> · 54<br/>app clipboard drag"]
+    K --> TE["<b>Terminal</b> · 12<br/>term"]
+    K --> SY["<b>System</b> · 25<br/>system"]
+    K --> VI["<b>Vision</b> · 22<br/>vision"]
+    K --> IS["<b>Isolation</b><br/>sandbox"]
 
-    AGENT --> PLANES
+    BR --> BRT["Chromium child<br/>CDP over pipe"]
+    NA --> NAT["macOS<br/>Accessibility API"]
+    TE --> TET["PTY +<br/>screen parser"]
+    SY --> SYT["audio · power · radios<br/>sensors · processes · FS"]
+    VI --> VIT["continuous capture<br/>OCR · diff · detect"]
+    IS --> IST["APFS fork +<br/>sandbox-exec"]
 
-    classDef plane fill:#1f2937,stroke:#60a5fa,stroke-width:1px,color:#e5e7eb
-    class B,N,T,S,V,X plane
+    classDef plane fill:#1e3a5f,stroke:#60a5fa,stroke-width:1px,color:#e5e7eb
+    classDef target fill:#1f2937,stroke:#4b5563,color:#9ca3af
+    classDef hub fill:#312e5f,stroke:#a78bfa,stroke-width:2px,color:#e5e7eb
+    class BR,NA,TE,SY,VI,IS plane
+    class BRT,NAT,TET,SYT,VIT,IST target
+    class K hub
 ```
 
-The agent does not care which plane a capability lives on. `page.click`, `app.menu.click`, `term.write`, `system.audio.volume`, and `vision.find_text` are the same shape of call, over the same socket, with the same error contract and the same trace record.
+The agent never needs to know which plane answers. `page.click`, `app.menu.click`, `term.write`, `system.audio.volume`, and `vision.find_text` are the same shape of call, over the same socket, with the same error contract and the same trace record.
 
 ---
 
@@ -47,68 +56,36 @@ The agent does not care which plane a capability lives on. `page.click`, `app.me
 Every agent session runs its own MCP server. Those servers race for a lock; the winner becomes the broker daemon and the rest become its clients. There is no separate service to start and no port to collide on.
 
 ```mermaid
-flowchart TB
-    subgraph TERMS["Agent sessions — any number, any terminal"]
-        C1["session A"]
-        C2["session B"]
-        C3["session N"]
-    end
+flowchart LR
+    S1["session A"] -->|"stdio<br/>LSP framed"| M1["mcp-server"]
+    S2["session B"] -->|"stdio"| M2["mcp-server"]
+    S3["session N"] -->|"stdio"| M3["mcp-server"]
 
-    subgraph MCPS["MCP servers — one per session, stdio"]
-        M1["mcp-server"]
-        M2["mcp-server"]
-        M3["mcp-server"]
-    end
+    M1 -->|"wins flock"| BK(("broker<br/>daemon"))
+    M2 -->|"loses → client"| SK[["broker.sock<br/>JSON-RPC 2.0<br/>16MB cap"]]
+    M3 -->|"loses → client"| SK
+    SK --> BK
 
-    C1 -->|"LSP framing<br/>8KB header"| M1
-    C2 -->|"LSP framing"| M2
-    C3 -->|"LSP framing"| M3
+    BK --> RG["SessionRegistry<br/>+ router<br/>+ crash recovery<br/>+ trace"]
 
-    LOCK{{"flock LOCK_EX·LOCK_NB<br/>~/.one-for-all/broker.lock"}}
-    M1 --> LOCK
-    M2 --> LOCK
-    M3 --> LOCK
+    RG --> BE["browser-engine"]
+    RG --> OT["native · terminal<br/>system · vision<br/>sandbox"]
 
-    LOCK -->|"winner<br/>becomes daemon"| BROKER
-    LOCK -->|"losers connect<br/>as clients"| SOCK
+    BE -->|"CDP · NUL framed<br/>fd 3/4 · 100MB cap"| C1["Chromium A<br/>own user-data-dir"]
+    BE --> C2["Chromium B<br/>own user-data-dir"]
+    BE --> C3["Chromium N<br/>own user-data-dir"]
 
-    SOCK[["~/.one-for-all/broker.sock<br/>newline-delimited JSON-RPC 2.0 · 16MB cap"]]
-    SOCK --> BROKER
+    FM(["focus-manager<br/>NSWorkspace guardian"]) -.->|"save/restore<br/>frontmost"| C1
+    FM -.-> OT
 
-    subgraph BROKER["broker — singleton daemon"]
-        REG["SessionRegistry<br/>DashMap&lt;SessionId, Arc&lt;Browser&gt;&gt;"]
-        ROUTER["JSON-RPC router<br/>dispatch by family"]
-        REC["crash recovery<br/>30s activity window"]
-        TRACE["trace recorder<br/>sessions/&lt;id&gt;/trace/*.jsonl"]
-    end
-
-    ROUTER --> ENG
-    subgraph ENG["Engines"]
-        BE["browser-engine"]
-        NC["native-control"]
-        TC["terminal-control"]
-        SC["system-control"]
-        VI["vision"]
-        SB["sandbox"]
-    end
-
-    BE -->|"NUL-delimited CDP<br/>fd 3 / fd 4 · 100MB cap"| CHROME
-    subgraph CHROME["Chromium children — one per session"]
-        K1["--user-data-dir A"]
-        K2["--user-data-dir B"]
-        K3["--user-data-dir N"]
-    end
-
-    FOCUS(["focus-manager<br/>NSWorkspace guardian actor"])
-    FOCUS -.->|"save + restore frontmost"| CHROME
-    FOCUS -.-> NC
-
-    classDef daemon fill:#1e3a5f,stroke:#60a5fa,color:#e5e7eb
-    classDef engine fill:#1f2937,stroke:#34d399,color:#e5e7eb
-    classDef chrome fill:#3f2937,stroke:#fbbf24,color:#e5e7eb
-    class REG,ROUTER,REC,TRACE daemon
-    class BE,NC,TC,SC,VI,SB engine
-    class K1,K2,K3 chrome
+    classDef sess fill:#1f2937,stroke:#4b5563,color:#9ca3af
+    classDef core fill:#1e3a5f,stroke:#60a5fa,color:#e5e7eb
+    classDef eng fill:#14352b,stroke:#34d399,color:#e5e7eb
+    classDef krom fill:#3f2937,stroke:#fbbf24,color:#e5e7eb
+    class S1,S2,S3,M1,M2,M3 sess
+    class BK,RG,SK core
+    class BE,OT,FM eng
+    class C1,C2,C3 krom
 ```
 
 **Three transports, three framings, deliberately.** MCP stdio is LSP-framed (8KB header cap). The broker socket is newline-delimited JSON-RPC 2.0 (16MB cap). CDP is NUL-delimited over `--remote-debugging-pipe` on fd 3/fd 4 (100MB cap) — no port, no localhost firewall prompt, no WebSocket upgrade. Per-target channels are bounded at 1024; backpressure drops oldest and increments a metric rather than ever blocking the CDP reader.
@@ -136,7 +113,24 @@ Plus `session.*`, `broker.*`, and `_internal.*` for lifecycle, shutdown, health,
 
 ---
 
-## Design decisions that drive everything else
+## Where existing stacks stop
+
+| Stack | Reach | Isolation | Element identity |
+|---|---|---|---|
+| Playwright | Browser only | Cooperative contexts | Locator re-resolves every action |
+| Puppeteer | Browser only | Cooperative contexts | Handles invalidate on navigation |
+| chromedp | Browser only | Single target | No AX surfacing |
+| Selenium BiDi | Browser only | W3C sessions | No AX-tree primitive |
+| browser-use | Browser only | Cooperative | Index shifts on every snapshot |
+| browserless | Browser only | Container per session | — |
+| Screenshot-and-click loops | Pixels only | None | Coordinates, no identity |
+| **one-for-all** | **Browser + native + PTY + system + vision** | **OS-level, process + APFS fork + sandbox-exec** | **sha256-stable refs, explicit `ElementStale`** |
+
+The reach column is the point. Every row above hands an agent one aperture onto the machine and leaves it blind to the rest.
+
+---
+
+## Design decisions
 
 ### One Chromium child per session
 
@@ -144,7 +138,7 @@ The requirement "tabs survive session exit" cannot be met by `BrowserContext` pl
 
 That choice pays for itself: storage isolation becomes **OS-level rather than cooperative**. Cookies, IndexedDB, CacheStorage, service workers, permissions, downloads, certificate cache, font cache and GPU shader cache cannot cross a process boundary. The cost is ~80MB per session; the default cap of 16 concurrent sessions bounds it at ~1.3GB.
 
-### Snapshots that do not silently lie
+### Element refs that survive layout drift
 
 Page state comes from a merge of `Accessibility.getFullAXTree` and `DOMSnapshot.captureSnapshot`, with sha256-stable element refs that survive layout drift. A ref whose element is gone returns `ElementStale -32004`. It never silently retargets to a different element — the failure mode that makes index-based automation quietly click the wrong thing.
 
@@ -166,7 +160,7 @@ flowchart LR
     class A,D,M,R,AUG,C,E,NW,F,VP,MO,OUT n
 ```
 
-### Never steal focus
+### Zero focus-steal, enforced at compile time
 
 Five independent layers of defence keep a spawning Chromium or a driven native app from taking the frontmost position away from the user, backed by a `NSWorkspace` guardian actor that saves and restores the frontmost application around every focus-risking operation. `clippy::disallowed_methods` is configured to reject every AppKit call that could steal focus outside `focus-manager`, so the boundary is enforced at compile time — and a test asserts no forbidden AppKit symbol appears anywhere else in the workspace.
 
