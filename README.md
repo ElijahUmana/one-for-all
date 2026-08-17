@@ -17,9 +17,19 @@ Install once. Every agent session in every terminal gets the full surface automa
 
 ---
 
-## Continuous perception
+## The design in two principles
 
-**This is the primitive everything else is built on.** Every other computer-use stack re-derives the world before each action:
+**1 — Perception is continuous.** One always-current world model, published atomically and read in constant time. The agent never pays to look.
+
+**2 — Coverage is total.** Every sub-granularity of every surface is reachable, and anything that genuinely is not says so out loud rather than returning a plausible empty.
+
+The first makes an agent fast and never stale. The second makes it able to finish the job instead of stalling one step from the end. Everything below follows from those two.
+
+---
+
+## 1 · Continuous perception
+
+Every other computer-use stack re-derives the world before each action:
 
 ```
 list apps → list windows → walk the accessibility tree → screenshot
@@ -73,15 +83,28 @@ An agent told "structure is 400 ms stale" behaves correctly. An agent handed a s
 
 ---
 
-## Total coverage, by design
+## 2 · Total coverage
 
-The second principle is as load-bearing as the first: **there is no browser interaction, no computer action, and no visual detail at any level of sub-granularity that an agent should be unable to reach.** Not "the common cases plus an escape hatch" — the whole surface, enumerated as a contract before it was built.
+The usual way to scope an automation surface is to cover the obvious 80% and hand the rest to an escape hatch — shell out, inject a script, screenshot and guess. That sounds pragmatic, and it fails in a specific and expensive way: **the missing 20% is not exotic, it is where real work lives.** A task does not fail at step one. It fails at step nine, after the agent has already done eight things correctly.
 
-This is a deliberate rejection of how automation stacks normally scope themselves. They cover the obvious 80% of a surface and leave the rest to shelling out, injecting a script, or screenshotting and guessing. But the missing 20% is where real work actually lives: the CJK composition event, the file dropped *into* a page rather than onto the app, the service worker that has to be triggered by hand, the Bluetooth radio, the alternate-screen curses app, the modal that appeared and was never announced to the accessibility tree, the element inside a cross-origin iframe whose coordinates are in a different document's space.
+| The capability that gets skipped | What becomes impossible without it |
+|---|---|
+| IME composition events | Any CJK or accented input — typing 北京 into a field |
+| File drop *into* a page | Upload zones that accept a drag but expose no file input |
+| Service-worker triggering | Offline behaviour, push, cache warming |
+| IndexedDB and CacheStorage writes | Apps that keep their entire state client-side |
+| Cross-origin iframe geometry | Payment flows, OAuth, embedded editors — the click lands in the wrong document |
+| Alternate-screen detection | `vim`, `htop`, `less` — without it the agent reads garbled scrollback as if it were output |
+| Shell command boundaries | Knowing whether a command finished, and with what exit code |
+| Clipboard images and file lists | Moving a screenshot or a set of files between two applications |
+| Pointer pressure and tilt | Stylus input, pressure-sensitive canvases |
+| Radios, power, USB | Any workflow conditional on real hardware state |
 
-An agent that hits one of those holes does not degrade gracefully. It does the wrong thing confidently — which is why coverage and the no-silent-loss contract are the same commitment viewed from two sides: reach everything, and when something genuinely cannot be reached, say so out loud rather than returning a plausible empty.
+So the principle is the opposite of graceful degradation: **every sub-granularity of every surface is reachable**, enumerated as a contract before it was built rather than grown as features were requested.
 
-**242 methods across 14 families** exist to close that gap, mapped surface by surface in the coverage table below.
+That commitment only means something paired with the first principle's honesty rule. An agent that hits an uncovered hole does not stop — it does the wrong thing confidently. So the two halves are inseparable: **reach everything, and where something genuinely cannot be reached, say so out loud instead of returning a plausible empty.** Coverage without that is worse than no coverage, because it converts a visible gap into a silent wrong answer.
+
+**242 methods across 14 families** is what closing that gap actually costs. The full map — including the deep-input, deep-state, deep-network and sub-granularity vision surfaces most stacks never expose — is [below](#the-capability-surface).
 
 ---
 
