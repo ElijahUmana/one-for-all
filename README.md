@@ -17,6 +17,18 @@ Install once. Every agent session in every terminal gets the full surface automa
 
 ---
 
+## The mandate: no blind spots
+
+The system was specified against one requirement:
+
+> There should be no sort of browser page, no sort of internet page, no sort of computer action, no sort of vision in any type of sub-granularity in any way that should not be possible.
+
+Every other design choice here falls out of that. Most automation stacks cover the obvious 80% of a surface and leave the rest to "escape hatches" — shell out, inject a script, take a screenshot and guess. The remaining 20% is where real work actually lives: the CJK composition event, the file dropped *into* a web page, the service worker that has to be triggered by hand, the Bluetooth radio, the alternate-screen curses app, the modal that appeared but was never announced to the accessibility tree.
+
+**242 RPC methods across 14 families** exist to close that gap. Not a plugin surface — one enumerated contract, specified before it was built.
+
+---
+
 ## Six control planes, one protocol
 
 A browser driver sees only the browser. A screenshot loop sees only pixels. A shell sees only the shell. one-for-all puts all of them behind one broker, so an agent filling a web form can also read the Finder window behind it, watch a build log in a PTY, check whether the screen has stopped animating, and fork its own state to try two approaches at once.
@@ -110,6 +122,48 @@ flowchart LR
 | `drag.*` | 2 | Cross-application drag, drag from Finder |
 
 Plus `session.*`, `broker.*`, and `_internal.*` for lifecycle, shutdown, health, and metrics.
+
+### The sub-granularity that usually gets skipped
+
+The families above are the headline. This is the part the mandate was actually written for — each row is a place other stacks stop and hand you an escape hatch.
+
+| | Surface | What it covers |
+|---|---|---|
+| **U1** | Browser deep input | Multi-touch tap/swipe/pinch/rotate, pointer events with pressure and tilt, file drop *into* a page via `synthesizeDragEvent`, IME composition for CJK, dead keys, velocity-controlled precise scroll, tab-order traversal, right-click menu navigation |
+| **U2** | Browser deep state | IndexedDB list/query/put/delete, CacheStorage, service workers, web workers, deep cookie set, local/sessionStorage with compare-and-swap, permission grant/revoke/query, storage quota |
+| **U3** | Browser deep network | Fulfil, modify or fail a request in flight, XHR replay, WebSocket observe *and* frame injection, EventSource observe, HAR export, proxy config, MITM cert install into the per-session trust store |
+| **U4** | Performance + introspection | Tracing timeline, `Performance.getMetrics`, JS and CSS precise coverage, heap snapshot and allocation sampling, CPU profile, layout metrics, paint-rect flashing |
+| **U5** | Print | Full `printToPDF` option surface, print-media preview |
+| **U6** | Native macOS depth | Menu bar, status menu, Notification Center, Spotlight, Spaces, Dock, window geometry, Touch Bar, three-finger swipe, force touch with pressure, input-source switching, Shortcuts, Automator, AppleScript, JXA, QuickLook |
+| **U7** | Clipboard + cross-app drag | Strings, files, images, type enumeration, change-count-backed history, drag from Finder, drag between apps |
+| **U8** | System devices | CoreAudio in/out/select/volume/mute/capture, mic capture, camera snapshot, region screen capture, Bluetooth scan/connect, USB enumeration, battery, network interfaces/routes/live connections, process list/info/signal, FSEvents watches, Spotlight and `mdls` metadata |
+| **U9** | Terminal / PTY | Real PTY — not a bash subshell. `vte`-parsed screen with cursor and attributes, scrollback ring, resize, signals, alternate-screen detection, xterm mouse-sequence injection |
+| **U10** | Vision sub-granularity | Single-pixel RGBA off the frame ring, region classification, colour palette, text style, layout segmentation, icon recognition, QR/barcode, scrollbar position, loading/spinner detection, tooltip and modal detection, semantic diff as no-op/progress/failure/success, animation frame capture, face blur |
+
+U1 through U10 are dispatched by the broker today. Two specified surfaces are not yet wired:
+
+| | Surface | Status |
+|---|---|---|
+| **U11** | Atomicity + conditionals — `action.batch` (atomic, stop-on-error), `if_then` over predicates, `retry_until` with backoff, scheduled `action.at`, exclusive `lock_focus` | Specified, not yet dispatched |
+| **U12** | Nested agents — spawn a sub-agent session, observe its trace, hand off a session, merge its diverged state back | Specified, not yet dispatched. The merge primitive it builds on exists in `sandbox` |
+
+Cross-cutting (**U13**): every call emits a trace event when `trace: true`; clipboard reads return `{redacted: true}` against user redact patterns; first use of a permission-gated device prompts; every PTY session inherits the session sandbox policy; native control respects a per-session `app_blocklist`; face detection is consent-gated behind an explicit capability.
+
+---
+
+## Performance
+
+The bench suite asserts hard SLOs and fails the build rather than reporting a regression quietly. `scripts/ci-bench-gate.sh` surfaces a tracked WARN when a gate is skipped — there is no silent skip.
+
+| Benchmark | Gate |
+|---|---|
+| `cdp_request_per_sec` | ≥ 10,000 req/s |
+| `vision_find_text_p99` | ≤ 10 ms |
+| `frame_capture_to_event_p99` | ≤ 50 ms |
+| `page_click_p99` | ≤ 100 ms (end-to-end, real Chromium) |
+| `sandbox_spawn_p99` | ≤ 3 s |
+
+The design target behind those numbers: an agent should never pay a perception tax. Conventional computer-use loops re-derive the world before every action — enumerate apps, walk the accessibility tree, screenshot, guess coordinates — costing hundreds of milliseconds per click and leaving the model with no continuous awareness between actions. Here the state is already computed and already on the table when the model reads it.
 
 ---
 
