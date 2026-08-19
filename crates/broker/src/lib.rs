@@ -68,6 +68,8 @@ pub struct State {
     pub metrics: MetricsRegistry,
     /// SPEC §10 M10 — per-session trace writer registry.
     pub traces: TraceRegistry,
+    /// SPEC §12 / public architecture — fused five-stream world-state.
+    pub world_model: std::sync::Arc<world_model::WorldModel>,
     /// Total successful JSON-RPC calls; surfaced via `_internal.metrics`.
     pub request_counter: std::sync::atomic::AtomicU64,
     pub error_counter: std::sync::atomic::AtomicU64,
@@ -113,6 +115,7 @@ impl State {
             started_at: Instant::now(),
             metrics: MetricsRegistry::new(),
             traces: TraceRegistry::new(),
+            world_model: world_model::WorldModel::new(),
             request_counter: std::sync::atomic::AtomicU64::new(0),
             error_counter: std::sync::atomic::AtomicU64::new(0),
             max_sessions: max_sessions.max(1),

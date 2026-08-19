@@ -42,6 +42,8 @@ system-control = { workspace = true }
 terminal-control = { path = "../terminal-control" }
 # SPEC §11 V4 — continuous vision pipeline (capture/diff/OCR/subscribe).
 vision = { path = "../vision", features = ["macos-vision"] }
+# Explicit fused five-stream world-state publication.
+world-model = { path = "../world-model" }
 # SPEC §11 V5 — bincode binary topic for vision.frame events; bumpalo
 # arenas for per-call hot-path scratch; HDR histograms via observability.
 bincode = { workspace = true }

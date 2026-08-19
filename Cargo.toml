@@ -16,6 +16,7 @@ members = [
     "crates/native-control",
     "crates/system-control",
     "crates/terminal-control",
+    "crates/world-model",
 ]
 
 [workspace.package]
