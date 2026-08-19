@@ -219,6 +219,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "vision",
+ "world-model",
 ]
 
 [[package]]
@@ -3500,6 +3501,23 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
+]
+
+[[package]]
+name = "world-model"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "core-graphics",
+ "native-control",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "system-control",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "vision",
 ]
 
 [[package]]
